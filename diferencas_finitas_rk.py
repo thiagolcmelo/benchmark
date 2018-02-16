@@ -70,12 +70,30 @@ x_au = np.linspace(-L_au/2, L_au/2, N)
 dx_au = x_au[1] - x_au[0]
 
 # diferencas finitas
+# alpha = 1j / (2 * dx_au ** 2)
+# beta = - 1j / (dx_au ** 2)
+# diagonal_1 = [beta] * N
+# diagonal_2 = [alpha] * (N - 1)
+# diagonais = [diagonal_1, diagonal_2, diagonal_2]
+# M = diags(diagonais, [0, -1, 1]).toarray()
+
 alpha = 1j / (2 * dx_au ** 2)
 beta = - 1j / (dx_au ** 2)
-diagonal_1 = [beta] * N
-diagonal_2 = [alpha] * (N - 1)
-diagonais = [diagonal_1, diagonal_2, diagonal_2]
-M = diags(diagonais, [0, -1, 1]).toarray()
+alpha_b = -1j / (dx_au ** 2)
+beta_b = 1j / (2 * dx_au ** 2)
+gamma_b = 1j / (2 * dx_au ** 2)
+
+diagonal_1 = [beta_b] + ([beta] * (N-2)) + [beta_b]
+
+diagonal_2 = [gamma_b] + [0] * (N - 3)
+diagonal_3 = [alpha_b] + [alpha] * (N - 2)
+diagonal_4 = [alpha] * (N - 2) + [alpha_b]
+diagonal_5 = [0] * (N - 3) + [gamma_b]
+
+diagonais = [diagonal_1, diagonal_2, diagonal_3, diagonal_4, diagonal_5]
+M = diags(diagonais, [0, -2, -1, 1, 2]).toarray()
+
+
 
 # pacote de onda
 PN = 1/(2*np.pi*sigma_x_au**2)**(1/4)
@@ -100,9 +118,8 @@ while x_f_au < -x_0_au:
     tempo += dt
     contador += 1
     if contador % 100 == 0:    
-        norma = 100 * A / A0
         A = (simps(np.conjugate(psi)*psi,x_au)).real
-        
+        norma = 100 * A / A0
         x_f_au = xm = (simps(np.conjugate(psi)* x_au * psi,x_au)).real / A
         xm2 = (simps(np.conjugate(psi)* x_au**2 * psi,x_au)).real / A
         xm3 = (simps(np.conjugate(psi)* x_au**3 * psi,x_au)).real / A
@@ -135,6 +152,5 @@ while x_f_au < -x_0_au:
         #plt.legend(handles=[line], loc=1)
         #plt.legend()
         plt.show()
-
 
 

@@ -53,7 +53,7 @@ E_0 = 150.0 # eV
 L = 100.0 # angstron
 sigma_x = 1.0 # angstron
 x_0 = -20.0 # angstron
-dt = dt_0 = 1e-20 # s
+dt = dt_0 = 1e-17 # s
 
 # unidades atomicas
 E_0_au = E_0 / au2ev
@@ -106,8 +106,8 @@ while x_f_au < -x_0_au:
     tempo += dt
     contador += 1
     if contador % 100 == 0:    
-        norma = 100 * A / A0
         A = (simps(np.conjugate(psi)*psi,x_au)).real
+        norma = 100 * A / A0
         
         x_f_au = xm = (simps(np.conjugate(psi)* x_au * psi,x_au)).real / A
         xm2 = (simps(np.conjugate(psi)* x_au**2 * psi,x_au)).real / A
@@ -124,14 +124,14 @@ while x_f_au < -x_0_au:
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
         
-        ax.text(-50.0, 0.4, r"$A = %.2f$ \%%" % (norma))
-        ax.text(-50.0, 0.35, r"$\langle x \rangle = %.2f$ \AA" % (xm *au2ang))
-        ax.text(-50.0, 0.30, r"$3 \sigma = %.2f$ \AA" % (3*sigma *au2ang))
-        ax.text(-50.0, 0.25, r"$\gamma = %.2f$" % (gamma))
-        ax.text(-50.0, 0.20, r"$t = %.2e$ s" % (tempo))
-        ax.text(-50.0, 0.15, n_label)
-        ax.text(-50.0, 0.10, dx_label)
-        ax.text(-50.0, 0.05, dt_label)
+        ax.text(-L/2, 0.4, r"$A = %.2f$ \%%" % (norma))
+        ax.text(-L/2, 0.35, r"$\langle x \rangle = %.2f$ \AA" % (xm *au2ang))
+        ax.text(-L/2, 0.30, r"$3 \sigma = %.2f$ \AA" % (3*sigma *au2ang))
+        ax.text(-L/2, 0.25, r"$\gamma = %.2f$" % (gamma))
+        ax.text(-L/2, 0.20, r"$t = %.2e$ s" % (tempo))
+        ax.text(-L/2, 0.15, n_label)
+        ax.text(-L/2, 0.10, dx_label)
+        ax.text(-L/2, 0.05, dt_label)
         
         plt.title("Pacote de Onda Plana (Evolução Temporal Crank-Nicolson)", fontsize=18)
         plt.xlabel("x (\AA)", fontsize=16)
