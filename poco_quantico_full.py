@@ -79,20 +79,25 @@ k_au = fftfreq(N, d=dx_au)
 
 # props do material
 eg = lambda x: 0.7 * (1.519 + 1.447 * x - 0.15 * x**2) # eV
-Eg = eg(0.4)
+me_x = lambda x: 0.067+0.083*x
+algaas_x = 0.4
+Eg = eg(algaas_x)
+me_algaas = me_x(algaas_x)
+me_gaas = me_x(0.0)
 Vb_au = Eg / au2ev
-me_eff = 0.067
 a = 100 # angstron
 a_au = a / au2ang
 v_au = np.vectorize(lambda x: Vb_au if np.abs(x) > a_au/2 else 0.0)(x_au)
+me_eff = np.vectorize(lambda x: me_algaas if np.abs(x) > a_au/2 else me_gaas)(x_au)
 
 # # runge-kutta ordem 4
-# alpha = 1j / (2 * dx_au ** 2)
-# beta = -1j * (v_au + 1.0 / (dx_au ** 2))
-# diagonal_1 = beta #[beta] * N
-# diagonal_2 = [alpha] * (N - 1)
-# diagonais = [diagonal_1, diagonal_2, diagonal_2]
-# D = diags(diagonais, [0, -1, 1]).toarray()
+# alpha = 1j / (2 * me_eff * dx_au ** 2)
+# beta = -1j * (v_au + 1.0 / (me_eff * dx_au ** 2))
+# diagonal_1 = beta
+# diagonal_2 = alpha[1:]
+# diagonal_3 = alpha[:-1]
+# diagonais = [diagonal_1, diagonal_2, diagonal_3]
+# D = diags(diagonais, [0, 1, -1]).toarray()
 # def propagador(p):
 #     k1 = D.dot(p)
 #     k2 = D.dot(p + dt_au * k1 / 2)
@@ -101,27 +106,30 @@ v_au = np.vectorize(lambda x: Vb_au if np.abs(x) > a_au/2 else 0.0)(x_au)
 #     return p + dt_au * (k1 + 2 * k2 + 2 * k3 + k4) / 6
 # propagador_titulo = "Runge-Kutta Ordem 4"
 
-# # crank-nicolson
-# alpha = - dt_au * (1j / (2 * dx_au ** 2))/2.0
-# beta = 1.0 - dt_au * (-1j * (v_au + 1.0 / (dx_au ** 2)))/2.0
-# gamma = 1.0 + dt_au * (-1j * (v_au + 1.0 / (dx_au ** 2)))/2.0
-# diagonal_1 = beta #[beta] * N
-# diagonal_2 = [alpha] * (N - 1)
-# diagonais = [diagonal_1, diagonal_2, diagonal_2]
-# invB = inv(diags(diagonais, [0, -1, 1]).toarray())
-# diagonal_3 = gamma #[gamma] * N
-# diagonal_4 = [-alpha] * (N - 1)
-# diagonais_2 = [diagonal_3, diagonal_4, diagonal_4]
-# C = diags(diagonais_2, [0, -1, 1]).toarray()
-# D = invB.dot(C)
-# propagador = lambda p: D.dot(p)
-# propagador_titulo = "Crank-Nicolson"
+# crank-nicolson
+alpha = - dt_au * (1j / (2 * me_eff * dx_au ** 2))/2.0
+beta = 1.0 - dt_au * (-1j * (v_au + 1.0 / (me_eff * dx_au ** 2)))/2.0
+gamma = 1.0 + dt_au * (-1j * (v_au + 1.0 / (me_eff * dx_au ** 2)))/2.0
+diagonal_1 = beta
+diagonal_2_1 = alpha[1:]
+diagonal_2_2 = alpha[:-1]
+diagonais = [diagonal_1, diagonal_2_1, diagonal_2_2]
+invB = inv(diags(diagonais, [0, 1, -1]).toarray())
+diagonal_3 = gamma
+diagonal_4_1 = -alpha[1:]
+diagonal_4_2 = -alpha[:-1]
+diagonais_2 = [diagonal_3, diagonal_4_1, diagonal_4_2]
+C = diags(diagonais_2, [0, 1, -1]).toarray()
+D = invB.dot(C)
+propagador = lambda p: D.dot(p)
+propagador_titulo = "Crank-Nicolson"
 
-# split step
-exp_v2 = np.exp(- 0.5j * v_au * dt_au)
-exp_t = np.exp(- 0.5j * (2 * np.pi * k_au) ** 2 * dt_au / me_eff)
-propagador = lambda p: exp_v2 * ifft(exp_t * fft(exp_v2 * p))
-propagador_titulo = "Split-Step"
+# # split step
+# me_eff = np.ones(N) * me_gaas
+# exp_v2 = np.exp(- 0.5j * v_au * dt_au)
+# exp_t = np.exp(- 0.5j * (2 * np.pi * k_au) ** 2 * dt_au / me_eff)
+# propagador = lambda p: exp_v2 * ifft(exp_t * fft(exp_v2 * p))
+# propagador_titulo = "Split-Step"
 
 # chutes iniciais
 n = 6
@@ -159,7 +167,7 @@ for s in range(n):
             psi = estados[s][1:-1]
             psi_conj = np.conjugate(psi)
             # <Psi|H|Psi>
-            p_h_p = simps(psi_conj * (-0.5 * derivada2 / me_eff + v_au[1:-1] * psi), x_au[1:-1])
+            p_h_p = simps(psi_conj * (-0.5 * derivada2 / me_eff[1:-1] + v_au[1:-1] * psi), x_au[1:-1])
             # divide por <Psi|Psi> 
             p_h_p /= A
             valores[s] = p_h_p.real * au2ev # eV
@@ -170,7 +178,7 @@ for s in range(n):
             ax.set_ylim([-0.1,1.5])
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
-            plt.title("Autoestados/Autovalores Poço Quântico (%s)" % (propagador_titulo), fontsize=18)
+            #plt.title("Autoestados/Autovalores Poço Quântico (%s)" % (propagador_titulo), fontsize=18)
             plt.xlabel("x (\AA)", fontsize=16)
             plt.ylabel(r'$E \, (eV)$', fontsize=16)
             
@@ -189,7 +197,7 @@ for s in range(n):
             plt.legend(handles=lines, loc=9, bbox_to_anchor=(0.5, -0.1), ncol=4)
             plt.show()
             
-            print("%.4e / %.4e" % (valores[s], valores_analiticos_ev[s]))
+            print("%d >>> %.4e / %.4e" % (contadores[s], valores[s], valores_analiticos_ev[s]))
             
             #if np.abs(1-valores[s]/valores_analiticos_ev[s]) < 0.001:
             if np.abs(1-valores[s]/v_ant) < 0.0001:
