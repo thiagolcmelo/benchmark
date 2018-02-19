@@ -106,30 +106,30 @@ me_eff = np.vectorize(lambda x: me_algaas if np.abs(x) > a_au/2 else me_gaas)(x_
 #     return p + dt_au * (k1 + 2 * k2 + 2 * k3 + k4) / 6
 # propagador_titulo = "Runge-Kutta Ordem 4"
 
-# crank-nicolson
-alpha = - dt_au * (1j / (2 * me_eff * dx_au ** 2))/2.0
-beta = 1.0 - dt_au * (-1j * (v_au + 1.0 / (me_eff * dx_au ** 2)))/2.0
-gamma = 1.0 + dt_au * (-1j * (v_au + 1.0 / (me_eff * dx_au ** 2)))/2.0
-diagonal_1 = beta
-diagonal_2_1 = alpha[1:]
-diagonal_2_2 = alpha[:-1]
-diagonais = [diagonal_1, diagonal_2_1, diagonal_2_2]
-invB = inv(diags(diagonais, [0, 1, -1]).toarray())
-diagonal_3 = gamma
-diagonal_4_1 = -alpha[1:]
-diagonal_4_2 = -alpha[:-1]
-diagonais_2 = [diagonal_3, diagonal_4_1, diagonal_4_2]
-C = diags(diagonais_2, [0, 1, -1]).toarray()
-D = invB.dot(C)
-propagador = lambda p: D.dot(p)
-propagador_titulo = "Crank-Nicolson"
+# # crank-nicolson
+# alpha = - dt_au * (1j / (2 * me_eff * dx_au ** 2))/2.0
+# beta = 1.0 - dt_au * (-1j * (v_au + 1.0 / (me_eff * dx_au ** 2)))/2.0
+# gamma = 1.0 + dt_au * (-1j * (v_au + 1.0 / (me_eff * dx_au ** 2)))/2.0
+# diagonal_1 = beta
+# diagonal_2_1 = alpha[1:]
+# diagonal_2_2 = alpha[:-1]
+# diagonais = [diagonal_1, diagonal_2_1, diagonal_2_2]
+# invB = inv(diags(diagonais, [0, 1, -1]).toarray())
+# diagonal_3 = gamma
+# diagonal_4_1 = -alpha[1:]
+# diagonal_4_2 = -alpha[:-1]
+# diagonais_2 = [diagonal_3, diagonal_4_1, diagonal_4_2]
+# C = diags(diagonais_2, [0, 1, -1]).toarray()
+# D = invB.dot(C)
+# propagador = lambda p: D.dot(p)
+# propagador_titulo = "Crank-Nicolson"
 
-# # split step
-# me_eff = np.ones(N) * me_gaas
-# exp_v2 = np.exp(- 0.5j * v_au * dt_au)
-# exp_t = np.exp(- 0.5j * (2 * np.pi * k_au) ** 2 * dt_au / me_eff)
-# propagador = lambda p: exp_v2 * ifft(exp_t * fft(exp_v2 * p))
-# propagador_titulo = "Split-Step"
+# split step
+me_eff = np.ones(N) * me_gaas
+exp_v2 = np.exp(- 0.5j * v_au * dt_au)
+exp_t = np.exp(- 0.5j * (2 * np.pi * k_au) ** 2 * dt_au / me_eff)
+propagador = lambda p: exp_v2 * ifft(exp_t * fft(exp_v2 * p))
+propagador_titulo = "Split-Step"
 
 # chutes iniciais
 n = 6
