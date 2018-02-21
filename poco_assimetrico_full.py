@@ -49,106 +49,56 @@ me = cte.value('electron mass')
 au2ang = au_l / 1e-10
 au2ev = au_e / ev
 
-# constantes do problema
-E0 = 150.0 # eV
-delta_x = 5.0 # angstron
-x0 = -30.0 # angstron
-xf = -40.0 # angstron
-l = 8.1e-6 # m
-
 # otimizando
-L = 200 # angstron
-N = 4096
+L = 10.0 # angstron
+N = 2048
 hN = int(N/2)
-dt = 1e-19 # s
+dt = 1e-20 # s
 
 # unidades atomicas
 L_au = L / au2ang
 dt_au = -1j * dt / au_t
-E0_au = E0 / au2ev
-delta_x_au = delta_x / au2ang
-x0_au = x0 / au2ang
-xf_au = xf / au2ang
-k0_au = np.sqrt(2 * E0_au)
 
 # malhas direta e reciproca
-dx = L / (N-1)
 x_au = np.linspace(-L_au/2.0, L_au/2.0, N)
 dx_au = np.abs(x_au[1] - x_au[0])
 k_au = fftfreq(N, d=dx_au)
 
 # props do material
-eg = lambda x: 0.7 * (1.519 + 1.447 * x - 0.15 * x**2) # eV
-me_x = lambda x: 0.067+0.083*x
-algaas_x = 0.4
-Eg = eg(algaas_x)
-me_algaas = me_x(algaas_x)
-me_gaas = me_x(0.0)
-Vb_au = Eg / au2ev
-a = 100 # angstron
-a_au = a / au2ang
-v_au = np.vectorize(lambda x: Vb_au if np.abs(x) > a_au/2 else 0.0)(x_au)
-me_eff = np.vectorize(lambda x: me_algaas if np.abs(x) > a_au/2 else me_gaas)(x_au)
-
-# # runge-kutta ordem 4
-# alpha = 1j / (2 * me_eff * dx_au ** 2)
-# beta = -1j * (v_au + 1.0 / (me_eff * dx_au ** 2))
-# diagonal_1 = beta
-# diagonal_2 = alpha[1:]
-# diagonal_3 = alpha[:-1]
-# diagonais = [diagonal_1, diagonal_2, diagonal_3]
-# D = diags(diagonais, [0, 1, -1]).toarray()
-# def propagador(p):
-#     k1 = D.dot(p)
-#     k2 = D.dot(p + dt_au * k1 / 2)
-#     k3 = D.dot(p + dt_au * k2 / 2)
-#     k4 = D.dot(p + dt_au * k3)
-#     return p + dt_au * (k1 + 2 * k2 + 2 * k3 + k4) / 6
-# propagador_titulo = "Runge-Kutta Ordem 4"
-
-# # crank-nicolson
-# alpha = - dt_au * (1j / (2 * me_eff * dx_au ** 2))/2.0
-# beta = 1.0 - dt_au * (-1j * (v_au + 1.0 / (me_eff * dx_au ** 2)))/2.0
-# gamma = 1.0 + dt_au * (-1j * (v_au + 1.0 / (me_eff * dx_au ** 2)))/2.0
-# diagonal_1 = beta
-# diagonal_2_1 = alpha[1:]
-# diagonal_2_2 = alpha[:-1]
-# diagonais = [diagonal_1, diagonal_2_1, diagonal_2_2]
-# invB = inv(diags(diagonais, [0, 1, -1]).toarray())
-# diagonal_3 = gamma
-# diagonal_4_1 = -alpha[1:]
-# diagonal_4_2 = -alpha[:-1]
-# diagonais_2 = [diagonal_3, diagonal_4_1, diagonal_4_2]
-# C = diags(diagonais_2, [0, 1, -1]).toarray()
-# D = invB.dot(C)
-# propagador = lambda p: D.dot(p)
-# propagador_titulo = "Crank-Nicolson"
+me_eff = 0.5
+adw_k0 = 0.0#-132.7074997
+k2 = 7.0
+k3 = 0.5
+k4 = 1.0
+v_adw = lambda x: adw_k0-k2*x**2+k3*x**3+k4*x**4
+v_au = np.vectorize(v_adw)(x_au)
 
 # split step
-me_eff = np.ones(N) * me_gaas
 exp_v2 = np.exp(- 0.5j * v_au * dt_au)
 exp_t = np.exp(- 0.5j * (2 * np.pi * k_au) ** 2 * dt_au / me_eff)
 propagador = lambda p: exp_v2 * ifft(exp_t * fft(exp_v2 * p))
 propagador_titulo = "Split-Step"
 
 # chutes iniciais
-n = 6
-short_grid = np.linspace(-1, 1, N)
-g = gaussian(N, std=int(N/50))
-estados = np.array([g * sp.legendre(i)(short_grid) for i in range(n)],dtype=np.complex_)
+n = 9
+a = 1.9
+sigma = 0.87
+g = np.vectorize(lambda x: np.exp(-(x-a)**2/(2*sigma))+np.exp(-(x+a)**2/(2*sigma)))(x_au)
+g /= np.sqrt(simps(np.abs(g)**2, x_au))
+estados = np.array([g for _ in range(n)],dtype=np.complex_)
 valores = np.zeros(n)
 contadores = np.zeros(n)
 
-valores_analiticos_ev = [0.044280126, 0.176480128, 0.394408742, 0.693159988, 1.060713269, 1.438011481]
+valores_analiticos_ev = [-12.258438, -6.045418, -5.286089, -0.646627, 0.691204, 4.053229, 7.368937, 11.235521, 15.431918]
+valores_analiticos_ev = np.array(valores_analiticos_ev) + adw_k0
 
-texto_x_l = -L/2
-texto_x_r = 0.7 * L/2
+texto_x_l = -10/2
+texto_x_r = 0.7 * 10/2
 
 for s in range(n):
     v_ant = 1.0
     while True:
         contadores[s] += 1
-        
         estados[s] = propagador(estados[s])
         
         # gram-shimdt
@@ -157,7 +107,6 @@ for s in range(n):
             estados[s] -= proj * estados[m]
             
         # normaliza
-        A = np.sqrt(simps(np.abs(estados[s])**2, x_au))
         estados[s] /= np.sqrt(simps(np.abs(estados[s])**2, x_au))
         
         if contadores[s] % 1000 == 0:
@@ -167,40 +116,46 @@ for s in range(n):
             psi = estados[s][1:-1]
             psi_conj = np.conjugate(psi)
             # <Psi|H|Psi>
-            p_h_p = simps(psi_conj * (-0.5 * derivada2 / me_eff[1:-1] + v_au[1:-1] * psi), x_au[1:-1])
+            p_h_p = simps(psi_conj * (-0.5 * derivada2 / me_eff + v_au[1:-1] * psi), x_au[1:-1])
             # divide por <Psi|Psi> 
-            p_h_p /= A
-            valores[s] = p_h_p.real * au2ev # eV
+            #p_h_p /= A
+            print(p_h_p)
+            valores[s] = p_h_p.real
             
             # especificos do grafico
             fig = plt.figure()
             ax = fig.add_subplot(1, 1, 1)
-            ax.set_ylim([-0.1,1.5])
+            ax.set_ylim([-20 + adw_k0,20 + adw_k0])
+            ax.set_xlim([-6, 6])
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
-            #plt.title("Autoestados/Autovalores Poço Quântico (%s)" % (propagador_titulo), fontsize=18)
-            plt.xlabel("x (\AA)", fontsize=16)
-            plt.ylabel(r'$E \, (eV)$', fontsize=16)
+            #plt.title("Autoestados/Autovalores Poço Suplo Assimétrico (%s)" % (propagador_titulo), fontsize=18)
+            plt.xlabel("x (u. a.)", fontsize=16)
+            plt.ylabel(r'$E \, (u. a.)$', fontsize=16)
             
             psif = [estados[m] for m in range(s+1)]
-            psif = [0.1 * p / np.ptp(p) + valores[m] for m, p in enumerate(psif)]
+            psif = [2 * p / np.ptp(p) + valores[m] for m, p in enumerate(psif)]
             lines = []
             for i, p in enumerate(psif):
-                line, = plt.plot(x_au * au2ang, p, lw=1.0, color=tableau20[i], label=r'$|\Psi_{%d} (x,t)|^2$' % i)
+                line, = plt.plot(x_au, p, lw=1.0, color=tableau20[i], label=r'$|\Psi_{%d} (x,t)|^2$' % i)
                 lines.append(line)
-                ax.text(texto_x_l, valores[i] + 0.02, r"$E_{%d} = %.4f$ eV" % (i, valores[i]))
-                ax.text(texto_x_r, valores[i] + 0.02, r"$%d$ K iterações" % (contadores[i]))
                 
-            
-            linev, = plt.plot(x_au * au2ang, v_au * au2ev, lw=1.0, color=tableau20[n], label='$V(x)$')
+                if i < len(psif) - 1 and valores[i+1]-valores[i] < 2.0:
+                    ax.text(texto_x_l, valores[i] - 1, r"$E_{%d} = %.5f$ eV" % (i, valores[i]))
+                    ax.text(texto_x_r, valores[i] - 1, r"$%d k$ iterações" % int(contadores[i]/1000))
+                else:
+                    ax.text(texto_x_l, valores[i] + 0.3, r"$E_{%d} = %.5f$ eV" % (i, valores[i]))
+                    ax.text(texto_x_r, valores[i] + 0.3, r"$%d k$ iterações" % int(contadores[i]/1000))
+                
+            linev, = plt.plot(x_au, v_au, lw=1.0, color=tableau20[n], label='$V(x)$')
             lines.append(linev)
             plt.legend(handles=lines, loc=9, bbox_to_anchor=(0.5, -0.1), ncol=4)
             plt.show()
             
-            print("%d >>> %.4e / %.4e" % (contadores[s], valores[s], valores_analiticos_ev[s]))
-            
-            #if np.abs(1-valores[s]/valores_analiticos_ev[s]) < 0.001:
-            if np.abs(1-valores[s]/v_ant) < 0.0001:
+            #print("%d >>> %.4e / %.4e" % (contadores[s], valores[s], valores_analiticos_ev[s]))
+            print("%d >>> %.8e" % (contadores[s], valores[s]))
+            #if np.abs(valores[s] - valores_analiticos_ev[s]) < 0.000001:
+            if np.abs(1-valores[s]/v_ant) < 0.0000001:
                 break
             else:
                 v_ant = valores[s]
