@@ -86,20 +86,20 @@ x_nm = x_m / 1e-9
 v_ev = v_j / ev
 v_au = v_ev / au2ev
 
-# runge-kutta ordem 4
-alpha = 1j / (2 * dx_au ** 2)
-beta = -1j * (v_au + 1.0 / (dx_au ** 2))
-diagonal_1 = beta #[beta] * N
-diagonal_2 = [alpha] * (N - 1)
-diagonais = [diagonal_1, diagonal_2, diagonal_2]
-D = diags(diagonais, [0, -1, 1]).toarray()
-def propagador(p):
-    k1 = D.dot(p)
-    k2 = D.dot(p + dt_au * k1 / 2)
-    k3 = D.dot(p + dt_au * k2 / 2)
-    k4 = D.dot(p + dt_au * k3)
-    return p + dt_au * (k1 + 2 * k2 + 2 * k3 + k4) / 6
-propagador_titulo = "Runge-Kutta Ordem 4"
+# # runge-kutta ordem 4
+# alpha = 1j / (2 * dx_au ** 2)
+# beta = -1j * (v_au + 1.0 / (dx_au ** 2))
+# diagonal_1 = beta #[beta] * N
+# diagonal_2 = [alpha] * (N - 1)
+# diagonais = [diagonal_1, diagonal_2, diagonal_2]
+# D = diags(diagonais, [0, -1, 1]).toarray()
+# def propagador(p):
+#     k1 = D.dot(p)
+#     k2 = D.dot(p + dt_au * k1 / 2)
+#     k3 = D.dot(p + dt_au * k2 / 2)
+#     k4 = D.dot(p + dt_au * k3)
+#     return p + dt_au * (k1 + 2 * k2 + 2 * k3 + k4) / 6
+# propagador_titulo = "Runge-Kutta Ordem 4"
 
 # # crank-nicolson
 # alpha = - dt_au * (1j / (2 * dx_au ** 2))/2.0
@@ -117,11 +117,11 @@ propagador_titulo = "Runge-Kutta Ordem 4"
 # propagador = lambda p: D.dot(p)
 # propagador_titulo = "Crank-Nicolson"
 
-# # split step
-# exp_v2 = np.exp(- 0.5j * v_au * dt_au)
-# exp_t = np.exp(- 0.5j * (2 * np.pi * k_au) ** 2 * dt_au)
-# propagador = lambda p: exp_v2 * ifft(exp_t * fft(exp_v2 * p))
-# propagador_titulo = "Split-Step"
+# split step
+exp_v2 = np.exp(- 0.5j * v_au * dt_au)
+exp_t = np.exp(- 0.5j * (2 * np.pi * k_au) ** 2 * dt_au)
+propagador = lambda p: exp_v2 * ifft(exp_t * fft(exp_v2 * p))
+propagador_titulo = "Split-Step"
 
 # chutes iniciais
 n = 6
@@ -179,16 +179,15 @@ for s in range(n):
             for i, p in enumerate(psif):
                 line, = plt.plot(x_au * au2ang, p, lw=1.0, color=tableau20[i], label=r'$|\Psi_{%d} (x,t)|^2$' % i)
                 lines.append(line)
-                ax.text(texto_x_l, valores[i] + 0.02, r"$E = %.4f$ eV" % (valores[i]))
-                ax.text(texto_x_r, valores[i] + 0.02, r"$Iter = %d$" % (contadores[i]))
+                ax.text(texto_x_l, valores[i] + 0.02, r"$E_{%d} = %.4f$ eV" % (i, valores[i]))
+                ax.text(texto_x_r, valores[i] + 0.02, r"$%d$ K iterações" % int(contadores[i]/1000))
                 
             
             linev, = plt.plot(x_au * au2ang, v_au * au2ev, lw=1.0, color=tableau20[n], label='$V(x)$')
             lines.append(linev)
-            plt.legend(handles=lines, loc=1)
-            plt.legend()
+            plt.legend(handles=lines, loc=9, bbox_to_anchor=(0.5, -0.1), ncol=4)
             plt.show()
             
             print("%.4e / %.4e" % (valores[s], valores_analiticos_ev[s]))
-            if np.abs(1-valores[s]/valores_analiticos_ev[s]) < 0.001:
+            if np.abs(1-valores[s]/valores_analiticos_ev[s]) < 0.0001:
                 break

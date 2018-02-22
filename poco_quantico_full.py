@@ -132,7 +132,7 @@ propagador = lambda p: exp_v2 * ifft(exp_t * fft(exp_v2 * p))
 propagador_titulo = "Split-Step"
 
 # chutes iniciais
-n = 6
+n = 5
 short_grid = np.linspace(-1, 1, N)
 g = gaussian(N, std=int(N/50))
 estados = np.array([g * sp.legendre(i)(short_grid) for i in range(n)],dtype=np.complex_)
@@ -178,7 +178,7 @@ for s in range(n):
             ax.set_ylim([-0.1,1.5])
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
-            #plt.title("Autoestados/Autovalores Poço Quântico (%s)" % (propagador_titulo), fontsize=18)
+            plt.title("Autoestados/Autovalores - Poço Quântico de $GaAs/Al_{0.4}Ga_{0.6}As$ (%s)" % (propagador_titulo), fontsize=18)
             plt.xlabel("x (\AA)", fontsize=16)
             plt.ylabel(r'$E \, (eV)$', fontsize=16)
             
