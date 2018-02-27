@@ -92,21 +92,27 @@ plt.rcParams['text.latex.unicode']=True
 fig = plt.figure()
 ax = fig.add_subplot(1, 1, 1)
 ax.set_ylim([-0.005,0.25])
-ax.text(-14, 0.22, r"$\mathbf{L = %.2f}$ \textbf{\AA}" % (L), color='red', fontsize=24)
+ax.text(-14, 0.22, r"$\mathbf{L = %.2f}$ \textbf{\AA}" % (L), \
+        color='red', fontsize=24)
 ax.text(texto_x, 0.235, r"N = %d pontos" % N)
-ax.text(texto_x, 0.21, r"$\Delta x = %.5f$ \AA" % (dx))
-ax.text(texto_x, 0.18, r"*$(t_f-t_i) = %s$ s" % (as_si(t_au * au_t, 2)))
-ax.text(texto_x, 0.15, r"$\langle x_i \rangle = %.5f$ \AA" % (x0_au * au2ang))
-ax.text(texto_x, 0.12, r"$\langle x_f \rangle = %.5f$ \AA" % (xm * au2ang))
+ax.text(texto_x, 0.21, r"$\Delta z = %.5f$ \AA" % (dx))
+ax.text(texto_x, 0.18, r"*$(t_f-t_i) = %s$ s" % \
+        (as_si(t_au * au_t, 2)))
+ax.text(texto_x, 0.15, r"$\langle z_i \rangle = %.5f$ \AA" % \
+        (x0_au * au2ang))
+ax.text(texto_x, 0.12, r"$\langle z_f \rangle = %.5f$ \AA" % \
+        (xm * au2ang))
 ax.text(texto_x, 0.09, r"$\sigma_i = %.5f$ \AA" % (delta_x_au * au2ang))
 ax.text(texto_x, 0.06, r"$\sigma_f = %.5f$ \AA" % (desvpad * au2ang))
-ax.text(texto_x, 0.03, r"$\gamma_i = \gamma_f = %.5f$" % np.abs(skewness))
+ax.text(texto_x, 0.03, r"$\gamma_i = \gamma_f = %.5f$" % \
+        np.abs(skewness))
 ax.text(texto_x, 0.005, r"$A_f/A_i = %.2f$ \%%" % (var_norma))
-plt.xlabel("x (\AA)", fontsize=24)
-plt.ylabel(r'$|\Psi (x,t)|^2$', fontsize=24)
+plt.gcf().subplots_adjust(bottom=0.15)
+plt.xlabel("z (\AA)", fontsize=24)
+plt.ylabel(r'$|\Psi (z,t)|^2$', fontsize=24)
 line1, = plt.plot(x_au * au2ang, np.abs(psi), lw=2.0, \
-    color=(31/255, 119/255, 180/255), label='$\Psi(x,t_f)$')
+    color=(31/255, 119/255, 180/255), label='$\Psi(z,t_f)$')
 line2, = plt.plot(x_au * au2ang, np.abs(psi0), lw=2.0, \
-    color=(174/255, 199/255, 232/255), label='$\Psi(x,t_i)$')
+    color=(174/255, 199/255, 232/255), label='$\Psi(z,t_i)$')
 plt.legend(handles=[line1,line2], loc=1)
 plt.show()
