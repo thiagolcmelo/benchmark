@@ -16,7 +16,19 @@ import scipy.constants as cte
 from scipy.sparse import diags
 from scipy.linalg import inv
 from scipy.fftpack import fft, ifft, fftfreq
-import time
+from scipy.spatial.distance import cdist
+from sklearn.preprocessing import StandardScaler
+import os, time
+from multiprocessing import Pool, TimeoutError
+import logging
+
+logger = logging.getLogger('onda_plana_logger')
+logger.setLevel(logging.DEBUG)
+ch = logging.StreamHandler()
+ch.setLevel(logging.DEBUG)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+ch.setFormatter(formatter)
+logger.addHandler(ch)
 
 # grandezas de interesse em unidades atomicas
 au_l = cte.value('atomic unit of length')
@@ -28,7 +40,7 @@ ev = cte.value('electron volt')
 au2ang = au_l / 1e-10
 au2ev = au_e / ev
 
-def pseudo_analitica(zi=-20.0, zf=20, E=150.0, deltaz=5.0, \
+def evolucao_analitica(zi=-20.0, zf=20, E=150.0, deltaz=5.0, \
     L=250.0, N=8192):
     """
     Evolui um pacote de onda de energia `E` e dispersão `deltax`
@@ -56,16 +68,21 @@ def pseudo_analitica(zi=-20.0, zf=20, E=150.0, deltaz=5.0, \
     
     Retorno
     -------
-    resumo : tuple
-        Os parâmetros retornados em uma tuple são:
+    resumo : dict
+        Os parâmetros retornados em um dict são:
+        - `L` o tamanho do espaço
+        - `N` o número de pontos
+        - `dt` o passo de tempo
+        - `metodo` o método utilizado
         - `grid_z` o grid espacial em Angstrom
         - `onda_inicial` uma list com a onda inicial
         - `onda_final` uma list com a onda final
         - `norma_inicial` norma do pacote inicial
         - `norma_final` norma do pacote final
+        - `conservacao` 100 * norma_final / norma_inicial
         - `desvpad` o desvio padrão do pacote final
         - `obliquidade` a obliquidade do pacote final
-        - `tempo` o tempo real
+        - `tempo` o tempo necessario para ir de zi ate zf
         - `zf_real` a posição média final, que pode diferir de `zf`
 
     Exemplo
@@ -135,7 +152,7 @@ def pseudo_analitica(zi=-20.0, zf=20, E=150.0, deltaz=5.0, \
         A = np.sqrt(A2)
         
         psic = np.conjugate(psi) # complexo conjugado
-        zm_au = (simps(psic * x_au * psi, z_au)).real / A2
+        zm_au = (simps(psic * z_au * psi, z_au)).real / A2
         
         # ajusta o tempo de evolucao
         if np.abs(zm_au - zf_au) >= 0.00001:
@@ -158,12 +175,25 @@ def pseudo_analitica(zi=-20.0, zf=20, E=150.0, deltaz=5.0, \
         desvpad_au = np.sqrt(np.abs(zm2-zm_au**2))
         obliquidade = (zm3-3*zm_au*desvpad_au**2-zm_au**3)/desvpad_au**3
     
-    return (z_au * au2ang, psi_inicial, psi, \
-            A0, A, desvpad_au * au2ang, obliquidade, \
-            tempo, zm_au * au2ang)
+    return {
+        'L': L,
+        'N': N,
+        'dt': dt,
+        'metodo': metodo,
+        'grid_z': z_au * au2ang,
+        'onda_inicial': psi_inicial,
+        'onda_final': psi,
+        'norma_inicial': A0,
+        'norma_final': A,
+        'conservacao': 100 * A / A0,
+        'desvpad': desvpad_au * au2ang,
+        'obliquidade': obliquidade,
+        'tempo': tempo,
+        'zf_real': zm_au * au2ang,
+    }
 
-def evolui(zi=-20.0, zf=20, E=150.0, deltaz=5.0, metodo='pe', \
-    L=100.0, N=256, dt=1e-20):
+def evolucao_numerica(zi=-20.0, zf=20, E=150.0, deltaz=5.0, \
+    metodo='pe', L=100.0, N=256, dt=1e-20):
     """
     Evolui um pacote de onda de energia `E` e dispersão `deltax`
     da posição inicial `zi` atá a posição final `zf` utilizando o
@@ -194,16 +224,21 @@ def evolui(zi=-20.0, zf=20, E=150.0, deltaz=5.0, metodo='pe', \
 
     Retorno
     -------
-    resumo : tuple
-        Os parâmetros retornados em uma tuple são:
+    resumo : dict
+        Os parâmetros retornados em um dict são:
+        - `L` o tamanho do espaço
+        - `N` o número de pontos
+        - `dt` o passo de tempo
+        - `metodo` o método utilizado
         - `grid_z` o grid espacial em Angstrom
         - `onda_inicial` uma list com a onda inicial
         - `onda_final` uma list com a onda final
         - `norma_inicial` norma do pacote inicial
         - `norma_final` norma do pacote final
-        - `desvpad` o desvio padrão do pacote final
+        - `conservacao` 100 * norma_final / norma_inicial 
+        - `desvpad` o desvio padrão do pacote final em Angstrom
         - `obliquidade` a obliquidade do pacote final
-        - `tempo_total` o tempo de execução
+        - `tempo_total` o tempo de execução em segundos
         - `iteracoes` o numero de iterações
         - `zf_real` a posição média final, que pode diferir de `zf`
 
@@ -264,7 +299,7 @@ def evolui(zi=-20.0, zf=20, E=150.0, deltaz=5.0, metodo='pe', \
     if metodo == 'cn':
         # parametros instaveis
         if dt_au / dz_au**2 > 0.5:
-            continue
+            raise Exception("Parâmetros instáveis")
         alpha = - dt_au * (1j / (2 * dz_au ** 2))/2.0
         beta = 1.0 - dt_au * (- 1j / (dz_au ** 2))/2.0
         gamma = 1.0 + dt_au * (- 1j / (dz_au ** 2))/2.0
@@ -342,230 +377,123 @@ def evolui(zi=-20.0, zf=20, E=150.0, deltaz=5.0, metodo='pe', \
 
     tempo_total_programa = tempo_final - tempo_inicial
     
-    return (z_au * au2ang, psi_inicial, psi, \
-            A0, A, desvpad_au * au2ang, obliquidade,
-            tempo_total_programa, iteracoes, zm_au * au2ang)
+    return {
+        'L': L,
+        'N': N,
+        'dt': dt,
+        'metodo': metodo,
+        'grid_z': z_au * au2ang,
+        'onda_inicial': psi_inicial,
+        'onda_final': psi,
+        'norma_inicial': A0,
+        'norma_final': A,
+        'conservacao': 100 * A / A0,
+        'desvpad': desvpad_au * au2ang,
+        'obliquidade': obliquidade,
+        'tempo_total': tempo_total_programa,
+        'iteracoes': iteracoes,
+        'zf_real': zm_au * au2ang
+    }
 
-# constantes do problema
-E0 = 150.0 # eV
-delta_x = 5.0 # angstron
-x0 = -20.0 # angstron
+if __name__ == '__main__':
 
-def solucao_pseudo_analitica(xm_final):
-    """
-    esta funcao ira buscar um tempo que a onda
-    levaria para atingir a posicao xm_final
-    e retorna os parametros
-    - conservacao da norma
-    - xm_medio encontrado (que difere um pouco de xm_final)
-    - desvio padrao da onda
-    - skewness da onda
-    - tempo que a onda leva para atingir xm_final
+    metodos = ['pe', 'cn', 'rk']
+    passos = [1e-20, 5e-20, 1e-19, 5e-19, 1e-18, 5e-18, 1e-17, \
+        5e-17, 1e-16, 5e-16]
+    passos = [1e-18, 5e-18, 1e-17, \
+        5e-17, 1e-16, 5e-16]
     
-    xm_final : float
-        um float indicando a posicao final
-        media esperada em Angstrom
-    """
-    L = 250 # angstron
-    N = 8192 # pontos
-    
-    if xm_final < -L/4 or xm_final > L/4:
-        return (0, 0, 0, 0, 0)
+    resultados = []
+    combinacoes = []
 
-    # valores iniciais
-    xm = 10.0
-    xm_a_aux = x0
-    dt_passo_aux = 1e-18
-    dt_passo = 5e-18
-    tt = 0.8e-14
-    var_norma = 0.0
-    desvpad = 1.0
-    skewness = 0.0
-    t_real = tt
-    
-    while np.abs(xm_final - xm * au2ang) >= 0.00001:
-        # transforma para unidades atomicas
-        L_au = L / au2ang
-        E0_au = E0 / au2ev
-        delta_x_au = delta_x / au2ang
-        t_au = (tt+dt_passo) / au_t
-        x0_au = x0 / au2ang
-        k0_au = np.sqrt(2 * E0_au)
+    for metodo in metodos:
+        for L in np.linspace(100,1000,7):
+            for N in [2**n for n in range(8,13)]:
+                for dt in passos:
+                    if dt < 1e-19 and metodo != 'pe':
+                        continue
+                    combinacoes.append((metodo, L, N, dt))
 
-        # malhas direta e reciproca
-        dx = L / (N-1)
-        x_au = np.linspace(-L_au/2.0, L_au/2.0, N)
-        dx_au = np.abs(x_au[1] - x_au[0])
-        k_au = fftfreq(N, d=dx_au)
-
-        # pacote de onda inicial
-        PN = 1/(2*np.pi*delta_x_au**2)**(1/4)
-        psi = PN*np.exp(1j*k0_au*x_au-(x_au-x0_au)**2/(4*delta_x_au**2))
-        A0 = simps(np.abs(psi)**2,x_au) # norma inicial
-        psi0 = np.copy(psi) # salva uma copia da onda inicial
-
-        # valores iniciais
-        xm = x0_au
-
-        # IMPLEMENTACAO DE FATO DA SOLUCAO PSEUDO ANALITICA
-        psi_k = fft(psi) # FFT do pacote inicial
-        omega_k = k_au**2 / 2
-        
-        # transformada inversa do pacote de onda multiplicado
-        # por uma funcao com a dependencia temporal
-        psi = ifft(psi_k * np.exp(-1j * omega_k * t_au))
-
-        # indicadores principaus
-        A = simps(np.abs(psi)**2,x_au).real # norma
-        var_norma = 100 * A / A0 # conservacao da norma
-        psis = np.conjugate(psi) # complexo conjugado
-        xm = (simps(psis * x_au * psi,x_au)).real / A # posicao media final <x>
-        xm_a = xm * au2ang
-        
-        # ajusta o tempo de evolucao
-        if np.abs(xm_final - xm_a) >= 0.00001:
-            if xm_a_aux < xm_final < xm_a or xm_a < xm_final < xm_a_aux:
-                aux = (dt_passo_aux-dt_passo) / 2
-            elif xm_final < xm_a and xm_final < xm_a_aux:
-                aux = - abs(dt_passo_aux-dt_passo)
-            elif xm_final > xm_a and xm_final > xm_a_aux:
-                aux = abs(dt_passo_aux-dt_passo)
-                
-            dt_passo_aux = dt_passo
-            dt_passo += aux
-            xm_a_aux = xm_a
+    def evolui_ponto(combinacao):
+        try:
+            metodo, L, N, dt = combinacao
             
-            continue
-        
-        # indicadores secundarios
-        xm2 = simps(psis * x_au**2 * psi,x_au).real / A
-        xm3 = simps(psis * x_au**3 * psi,x_au).real / A
-        desvpad = np.sqrt(np.abs(xm2 - xm**2)) # desvio padrao
-        skewness = (xm3 - 3*xm*desvpad**2-xm**3)/desvpad**3 # obliquidade
+            res = evolucao_numerica(L=L, N=N, \
+                dt=dt, metodo=metodo)
+            zf_real = res['zf_real']
             
-    return (var_norma, xm * au2ang, desvpad * au2ang, skewness, tt+dt_passo)
+            res_ana = evolucao_analitica(zf=zf_real)
+            
+            for k in res_ana.keys():
+                res[k + '_ana'] = res_ana[k]
+            
+            mensagem = "%s: L=%d, N=%d, dt=%.2e, " + \
+                        "A/A0=%.5f, S=%.4f, G=%.4f, " + \
+                        "A/A0_ana=%.5f, S_ana=%.4f, G_ana=%.4f, " + \
+                        "tempo=%.5f"
+            mensagem = mensagem % (metodo, L, N, dt,\
+                res['conservacao'], res['desvpad'], \
+                res['obliquidade'], res['conservacao_ana'], \
+                res['desvpad_ana'], res['obliquidade_ana'],
+                res['tempo_total'])
+            logger.info(mensagem)
 
-for metodo in ['pe', 'cn', 'rk']:
-    for L in np.linspace(100,1000,7):
-        for N in [2**n for n in range(8,13)]:
-            for dt in [1e-20, 5e-20, 1e-19, 5e-19, 1e-18, \
-                       5e-18, 1e-17, 5e-17, 1e-16, 5e-16]:
-                # dt = 1e-20 e 5e-20 usado apenas para o
-                # metodo pseudo-espectral
-                if dt < 1e-19 and metodo != 'pe':
-                    continue
-                    
-                # unidades atomicas
-                L_au = L / au2ang
-                dt_au = dt / au_t
-                E0_au = E0 / au2ev
-                delta_x_au = delta_x / au2ang
-                x0_au = x0 / au2ang
-                k0_au = np.sqrt(2 * E0_au)
+            return res
+        except Exception as err:
+            logger.error("Falha em %s: L=%d, N=%d, dt=%.2e" % \
+                (metodo, L, N, dt))
+            logger.error(str(err))
+            return {}
 
-                # malhas direta e reciproca
-                dx = L   / (N-1)
-                x_au = np.linspace(-L_au/2.0, L_au/2.0, N)
-                dx_au = np.abs(x_au[1] - x_au[0])
-                k_au = fftfreq(N, d=dx_au)
+    pool = Pool(processes=8)
+    resultados = pool.map(evolui_ponto, combinacoes)
 
-                # comeca a contar o tempo aqui
-                # porque inicializar algumas matrizes
-                # acaba levando muito tempo
-                inicio = time.time()
+    resultados = pd.DataFrame(resultados)
+    
+    pec = resultados.loc[resultados['metodo'] == 'pe']
+    cnc = resultados.loc[resultados['metodo'] == 'cn']
+    rkc = resultados.loc[resultados['metodo'] == 'rk']
+    pec.to_csv('onda_plana_resultados_pec.csv')
+    cnc.to_csv('onda_plana_resultados_cnc.csv')
+    rkc.to_csv('onda_plana_resultados_rkc.csv')
 
-                # runge-kutta ordem 4
-                if metodo == 'rk':
-                    # parametros instaveis
-                    if dt_au / dx_au**2 > 0.5:
-                        continue
-                    alpha = 1j / (2 * dx_au ** 2)
-                    beta = - 1j / (dx_au ** 2)
-                    diagonal_1 = [beta] * N
-                    diagonal_2 = [alpha] * (N - 1)
-                    diagonais = [diagonal_1, diagonal_2, diagonal_2]
-                    D = diags(diagonais, [0, -1, 1]).toarray()
-                    def propagador(p):
-                        k1 = D.dot(p)
-                        k2 = D.dot(p + dt_au * k1 / 2)
-                        k3 = D.dot(p + dt_au * k2 / 2)
-                        k4 = D.dot(p + dt_au * k3)
-                        return p + dt_au * (k1 + 2 * k2 + 2 * k3 + k4) / 6
-                
-                # crank-nicolson
-                if metodo == 'cn':
-                    # parametros instaveis
-                    if dt_au / dx_au**2 > 0.5:
-                        continue
-                    alpha = - dt_au * (1j / (2 * dx_au ** 2))/2.0
-                    beta = 1.0 - dt_au * (- 1j / (dx_au ** 2))/2.0
-                    gamma = 1.0 + dt_au * (- 1j / (dx_au ** 2))/2.0
-                    diagonal_1 = [beta] * N
-                    diagonal_2 = [alpha] * (N - 1)
-                    diagonais = [diagonal_1, diagonal_2, diagonal_2]
-                    invB = inv(diags(diagonais, [0, -1, 1]).toarray())
-                    diagonal_3 = [gamma] * N
-                    diagonal_4 = [-alpha] * (N - 1)
-                    diagonais_2 = [diagonal_3, diagonal_4, diagonal_4]
-                    C = diags(diagonais_2, [0, -1, 1]).toarray()
-                    D = invB.dot(C)
-                    propagador = lambda p: D.dot(p)
-                
-                # split step
-                if metodo == 'pe':
-                    exp_v2 = np.ones(N, dtype=np.complex_)
-                    exp_t = np.exp(- 0.5j * (2 * np.pi * k_au) ** 2 * dt_au)
-                    propagador = lambda p: exp_v2 * ifft(exp_t * fft(exp_v2 * p))
-                    
-                # pacote de onda inicial
-                PN = 1/(2*np.pi*delta_x_au**2)**(1/4)
-                psi = PN*np.exp(1j*k0_au*x_au-(x_au-x0_au)**2/(4*delta_x_au**2))
-                A0 = simps(np.abs(psi)**2,x_au)
+    # ajuste de escala dos parametros de qualidade
+    scaler = StandardScaler()
+    cols = ['devpad', 'obliquidade', 'conservacao', \
+        'devpad_ana', 'obliquidade_ana', 'conservacao_ana']
+    pec[cols] = scaler.fit_transform(pec[cols])
+    rkc[cols] = scaler.fit_transform(rkc[cols])
+    cnc[cols] = scaler.fit_transform(cnc[cols])
 
-                # valores iniciais
-                xm = x0_au
-                desvpad = delta_x_au
-                skewness = 0.0
-                contador = 0
+    fig, (ax1, ax2, ax3) = plt.subplots(1, 3, sharex=True, sharey=True)
+    with pd.plotting.plot_params.use('x_compat', True):
+        def minkowski(line, p=3):
+            x_num = [[line['desvpad'], line['obliquidade'], \
+                line['conservacao']]]
+            x_ana = [[line['desvpad_ana'], line['obliquidade_ana'], \
+                line['conservacao_ana']]]
+            dist = cdist(XA=x_num, XB=x_ana, metric='minkowski', p=p)
+            return dist[0][0]
 
-                while xm < -x0_au:
-                    psi = propagador(psi)
-                    contador += 1
+        pec['minkowski'] = pec.apply(minkowski, axis=1)
+        pec.plot(x='tempo_total', y='minkowski', kind='scatter', \
+            loglog=True, color='r', ax=ax1)
 
-                    if xm < x0_au:
-                        k0_au *= -1.0
-                        psi = PN*np.exp(1j*k0_au*x_au-(x_au-x0_au)**2/(4*delta_x_au**2))
-                        xm = x0_au
-                        continue
+        rkc['minkowski'] = rkc.apply(minkowski, axis=1)
+        rkc.plot(x='tempo_total', y='minkowski', kind='scatter', \
+            loglog=True, color='g', ax=ax2)
 
-                    # indicadores principais
-                    A = simps(np.abs(psi)**2,x_au).real
-                    var_norma = 100 * A / A0
-                    psis = np.conjugate(psi)
-                    xm = (simps(psis * x_au * psi,x_au)).real / A
-                    final = time.time()
-                    
-                    # se atingir 1000 segundos para a evolucao
-                    # se sim calcula os indicadores
-                    if final - inicio > 1000:
-                        # indicadores secundarios
-                        xm2 = simps(psis * x_au**2 * psi,x_au).real / A
-                        xm3 = simps(psis * x_au**3 * psi,x_au).real / A
-                        desvpad = np.sqrt(np.abs(xm2 - xm**2))
-                        skewness = (xm3 - 3*xm*desvpad**2-xm**3)/desvpad**3
-                        break
+        cnc['minkowski'] = cnc.apply(minkowski, axis=1)
+        cnc.plot(x='tempo_total', y='minkowski', kind='scatter', \
+            loglog=True, color='b', ax=ax3)
 
-                    # checa se a posicao final foi aingida
-                    # se sim calcula os indicadores
-                    if xm >= -x0_au:
-                        # indicadores secundarios
-                        xm2 = simps(psis * x_au**2 * psi,x_au).real / A
-                        xm3 = simps(psis * x_au**3 * psi,x_au).real / A
-                        desvpad = np.sqrt(np.abs(xm2 - xm**2))
-                        skewness = (xm3 - 3*xm*desvpad**2-xm**3)/desvpad**3
-
-                tempo_total_programa = final - inicio
-                var_norma_ana, xm_ana, desvpad_ana, skewness_ana, tt_ana = solucao_pseudo_analitica(xm*au2ang)
-                params = "{0:.0f},{1},{2:.1e},{3:.3e}".format(L,N,dt,L/N)
-                qualid = "{0:.8f},{1:.8f},{2:.8f}".format(var_norma, desvpad*au2ang, skewness)
-                print("{L:.0f},{N},{dt:.1e},{dx:.3e},{var_a:.8f},{xmed:.8f},{desvpad:.8f},{skewness:.8f},{c},{t:.3e},{time:.10f},{var_a_ana:.8f},{xmed_ana:.8f},{desvpad_ana:.8f},{skewness_ana:.8f},{tt_ana:.10e}".format(N=N,L=L,dt=dt,dx=L/N,t=contador*dt,var_a=var_norma,xmed=xm*au2ang,desvpad=desvpad*au2ang,skewness=skewness,c=contador,time=tempo_total_programa,var_a_ana=var_norma_ana,xmed_ana=xm_ana,desvpad_ana=desvpad_ana,skewness_ana=skewness_ana,tt_ana=tt_ana))
+    ax1.title.set_text('Pseudo-Espectral')
+    ax2.title.set_text('Runge-Kutta')
+    ax3.title.set_text('Crank-Nicolson')
+    ax1.set_ylabel('Minkowski (p=3)')
+    ax2.set_ylabel('Minkowski (p=3)')
+    ax3.set_ylabel('Minkowski (p=3)')
+    ax1.set_xlabel('Tempo total (s)')
+    ax2.set_xlabel('Tempo total (s)')
+    ax3.set_xlabel('Tempo total (s)')
+    plt.show()
