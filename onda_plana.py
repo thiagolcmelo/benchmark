@@ -26,9 +26,25 @@ logger = logging.getLogger('onda_plana_logger')
 logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
 ch.setLevel(logging.DEBUG)
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+formatter = logging.Formatter(\
+    '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 ch.setFormatter(formatter)
 logger.addHandler(ch)
+
+# configuracao do matplotlib
+plt.rcParams['savefig.dpi'] = 75
+plt.rcParams['figure.autolayout'] = False
+plt.rcParams['figure.figsize'] = 14, 8
+plt.rcParams['axes.labelsize'] = 18
+plt.rcParams['axes.titlesize'] = 22
+plt.rcParams['font.size'] = 20
+plt.rcParams['lines.linewidth'] = 1.5
+plt.rcParams['lines.markersize'] = 8
+plt.rcParams['legend.fontsize'] = 20
+plt.rcParams['font.family'] = "serif"
+plt.rcParams['font.serif'] = "computer modern sans serif"
+plt.rcParams['text.usetex']=True
+plt.rcParams['text.latex.unicode']=True
 
 # grandezas de interesse em unidades atomicas
 au_l = cte.value('atomic unit of length')
