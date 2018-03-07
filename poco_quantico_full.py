@@ -1,3 +1,9 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+"""
+
+"""
+
 # libraries
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,7 +16,8 @@ import scipy.special as sp
 from scipy.signal import gaussian
 
 # matplotlib defaults setup
-plt.rcParams['savefig.dpi'] = 75
+plt.rcParams['figure.dpi'] = 100
+#plt.rcParams['savefig.dpi'] = 75
 plt.rcParams['figure.autolayout'] = False
 plt.rcParams['figure.figsize'] = 14, 8
 plt.rcParams['axes.labelsize'] = 18
@@ -132,7 +139,7 @@ propagador = lambda p: exp_v2 * ifft(exp_t * fft(exp_v2 * p))
 propagador_titulo = "Split-Step"
 
 # chutes iniciais
-n = 5
+n = 6
 short_grid = np.linspace(-1, 1, N)
 g = gaussian(N, std=int(N/50))
 estados = np.array([g * sp.legendre(i)(short_grid) for i in range(n)],dtype=np.complex_)

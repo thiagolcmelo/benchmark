@@ -24,7 +24,6 @@ from sklearn.preprocessing import StandardScaler
 import os, time
 from multiprocessing import Pool, TimeoutError
 import logging
-
 logger = logging.getLogger('wave-packet-logger')
 logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()

@@ -1,6 +1,14 @@
+#!/usr/bin/env python
+"""
+This module just solves the analytical expression for a
+very specific case of quantum well, which is one made
+of GaAs surrounded by AlGaAs with concentration x=0.4
+"""
+
 # libraries
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from scipy.integrate import simps
 import scipy.constants as cte
 from scipy.sparse import diags
@@ -80,20 +88,22 @@ k_au = fftfreq(N, d=dx_au)
 
 # props do material
 eg = lambda x: 0.7 * (1.519 + 1.447 * x - 0.15 * x**2) # eV
-Eg = eg(0.4)
-Vb_au = Eg / au2ev
+Vb_au = (eg(0.4)-eg(0.0)) / au2ev
 me_eff = 0.067
 
 valores = []
+#poco_a = np.linspace(10,500,200)
 poco_a = [100]
-#poco_a = np.linspace(10,300,100)
 series = []
 for a in poco_a:
-    a_au = a / au2ang
-    v_au = np.vectorize(lambda x: Vb_au if np.abs(x) > a_au/2 else 0.0)(x_au)
-    # range de energias teste
-    f = lambda e: np.tan(np.sqrt(2*me_eff*e)*a_au/2)-np.sqrt(2*me_eff*(Vb_au-e)) / np.sqrt(2*me_eff*e)
     autovalores = []
+    
+    a_au = a / au2ang
+    
+    v_au = np.vectorize(lambda x: Vb_au if np.abs(x) > a_au/2 else 0.0)(x_au)
+    
+    f = lambda e: np.tan(np.sqrt(2*me_eff*e)*a_au/2)-np.sqrt(2*me_eff*(Vb_au-e)) / np.sqrt(2*me_eff*e)
+    
     for e0 in np.linspace(-Vb_au, Vb_au, 1000):
         try:
             root = newton(f, x0=e0)
@@ -103,6 +113,7 @@ for a in poco_a:
             pass
     
     f = lambda e: 1.0/np.tan(np.sqrt(2*me_eff*e)*a_au/2)+np.sqrt(2*me_eff*(Vb_au-e)) / np.sqrt(2*me_eff*e)
+    
     for e0 in np.linspace(-Vb_au, Vb_au, 1000):
         try:
             root = newton(f, x0=e0)
@@ -110,26 +121,24 @@ for a in poco_a:
                 autovalores.append(root * au2ev)
         except:
             pass
-    
+        
     autovalores = list(sorted(set(autovalores)))
     print(autovalores)
     for i, av in enumerate(autovalores):
         series.append((a, av))
 
+#pd.DataFrame(series, columns=['a', 'E']).to_csv('analytic_quantum_well.csv')
+        
 # especificos do grafico
-fig = plt.figure()
-ax = fig.add_subplot(1, 1, 1)
-ax.spines["top"].set_visible(False)
-ax.spines["right"].set_visible(False)
-plt.title("Autoestados de um Poço Quântico ($V_b=%.3f$ eV)" % Eg, fontsize=22)
-plt.xlabel("a (\AA)", fontsize=20)
-plt.ylabel(r'$E \, (eV)$', fontsize=20)
-lines = []
-x = [i for i,_ in series]
-y = [j for _,j in series]
-plt.scatter(x, y, c=tableau20[0], label='$E_{%d}$' % 0, s=2)
-plt.show()
-
-
-
-
+# fig = plt.figure()
+# ax = fig.add_subplot(1, 1, 1)
+# ax.spines["top"].set_visible(False)
+# ax.spines["right"].set_visible(False)
+# plt.title("Autoestados de um Poço Quântico ($V_b=%.3f$ eV)" % (Vb_au * au2ev), fontsize=22)
+# plt.xlabel("a (\AA)", fontsize=20)
+# plt.ylabel(r'$E \, (eV)$', fontsize=20)
+# lines = []
+# x = [i for i,_ in series]
+# y = [j for _,j in series]
+# plt.scatter(x, y, c=tableau20[0], label='$E_{%d}$' % 0, s=2)
+# plt.show()

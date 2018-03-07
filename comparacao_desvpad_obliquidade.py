@@ -18,7 +18,12 @@ plt.rcParams['text.latex.unicode']=True
 f, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(2, 3, sharey=True)
 
 mean, var, skew, kurt = norm.stats(moments='mvsk')
+
 x = np.linspace(-10, 10, 1000)
+
+
+
+
 ax1.plot(x, norm.pdf(x, loc=0, scale=0.5), 'r-', alpha=0.6, label='norm pdf')
 ax1.text(-8, 0.6, r"$\sigma < \sigma_0$")
 ax2.plot(x, norm.pdf(x, loc=0, scale=2.0), 'r-', alpha=0.6, label='norm pdf')
