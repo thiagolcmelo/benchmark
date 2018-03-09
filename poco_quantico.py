@@ -97,13 +97,9 @@ poco_a = [100]
 series = []
 for a in poco_a:
     autovalores = []
-    
     a_au = a / au2ang
-    
     v_au = np.vectorize(lambda x: Vb_au if np.abs(x) > a_au/2 else 0.0)(x_au)
-    
     f = lambda e: np.tan(np.sqrt(2*me_eff*e)*a_au/2)-np.sqrt(2*me_eff*(Vb_au-e)) / np.sqrt(2*me_eff*e)
-    
     for e0 in np.linspace(-Vb_au, Vb_au, 1000):
         try:
             root = newton(f, x0=e0)
@@ -111,9 +107,7 @@ for a in poco_a:
                 autovalores.append(root * au2ev)
         except:
             pass
-    
     f = lambda e: 1.0/np.tan(np.sqrt(2*me_eff*e)*a_au/2)+np.sqrt(2*me_eff*(Vb_au-e)) / np.sqrt(2*me_eff*e)
-    
     for e0 in np.linspace(-Vb_au, Vb_au, 1000):
         try:
             root = newton(f, x0=e0)
@@ -121,11 +115,19 @@ for a in poco_a:
                 autovalores.append(root * au2ev)
         except:
             pass
-        
     autovalores = list(sorted(set(autovalores)))
+    offset = [0]
+    for i, v in enumerate(autovalores):
+        if i > 0:
+            if np.abs(autovalores[i] / np.average(autovalores[offset[-1]:i])-1.0) > 0.01:
+                offset.append(i)
+    offset.append(len(autovalores))
+    autovalores = [np.average(autovalores[offset[i]:offset[i+1]]) for i in range(len(offset)-1)]
     print(autovalores)
     for i, av in enumerate(autovalores):
         series.append((a, av))
+
+    
 
 #pd.DataFrame(series, columns=['a', 'E']).to_csv('analytic_quantum_well.csv')
         
