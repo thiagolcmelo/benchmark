@@ -164,30 +164,31 @@ for s in range(n):
             p_h_p /= A
             valores[s] = p_h_p.real * au2ev # eV
             
-            # especificos do grafico
-            fig = plt.figure()
-            ax = fig.add_subplot(1, 1, 1)
-            ax.set_ylim([-0.1,1.1])
-            ax.spines["top"].set_visible(False)
-            ax.spines["right"].set_visible(False)
-            plt.title("Autoestados/Autovalores Oscilador Harmônico Quântico (%s)" % (propagador_titulo), fontsize=18)
-            plt.xlabel("x (\AA)", fontsize=16)
-            plt.ylabel(r'$E \, (eV)$', fontsize=16)
+#             # especificos do grafico
+#             fig = plt.figure()
+#             ax = fig.add_subplot(1, 1, 1)
+#             ax.set_ylim([-0.1,1.1])
+#             ax.spines["top"].set_visible(False)
+#             ax.spines["right"].set_visible(False)
+#             plt.title("Autoestados/Autovalores Oscilador Harmônico Quântico (%s)" % (propagador_titulo), fontsize=18)
+#             plt.xlabel("x (\AA)", fontsize=16)
+#             plt.ylabel(r'$E \, (eV)$', fontsize=16)
             
-            psif = [0.1 * estados[m]/np.ptp(estados[m]) + valores[m] for m in range(s+1)]
-            lines = []
-            for i, p in enumerate(psif):
-                line, = plt.plot(x_au * au2ang, p, lw=1.0, color=tableau20[i], label=r'$|\Psi_{%d} (x,t)|^2$' % i)
-                lines.append(line)
-                ax.text(texto_x_l, valores[i] + 0.02, r"$E_{%d} = %.4f$ eV" % (i, valores[i]))
-                ax.text(texto_x_r, valores[i] + 0.02, r"$%d$ K iterações" % int(contadores[i]/1000))
+#             psif = [0.1 * estados[m]/np.ptp(estados[m]) + valores[m] for m in range(s+1)]
+#             lines = []
+#             for i, p in enumerate(psif):
+#                 line, = plt.plot(x_au * au2ang, p, lw=1.0, color=tableau20[i], label=r'$|\Psi_{%d} (x,t)|^2$' % i)
+#                 lines.append(line)
+#                 ax.text(texto_x_l, valores[i] + 0.02, r"$E_{%d} = %.4f$ eV" % (i, valores[i]))
+#                 ax.text(texto_x_r, valores[i] + 0.02, r"$%d$ K iterações" % int(contadores[i]/1000))
                 
             
-            linev, = plt.plot(x_au * au2ang, v_au * au2ev, lw=1.0, color=tableau20[n], label='$V(x)$')
-            lines.append(linev)
-            plt.legend(handles=lines, loc=9, bbox_to_anchor=(0.5, -0.1), ncol=4)
-            plt.show()
+#             linev, = plt.plot(x_au * au2ang, v_au * au2ev, lw=1.0, color=tableau20[n], label='$V(x)$')
+#             lines.append(linev)
+#             plt.legend(handles=lines, loc=9, bbox_to_anchor=(0.5, -0.1), ncol=4)
+#             plt.show()
             
             print("%.4e / %.4e" % (valores[s], valores_analiticos_ev[s]))
             if np.abs(1-valores[s]/valores_analiticos_ev[s]) < 0.0001:
                 break
+
